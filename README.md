@@ -25,5 +25,5 @@ Scripts prontos para uso em sua instalação do Chatwoot que adicionam funcional
 
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/c0580732-49bb-435c-93c1-d99677d011c5" />
 
-
-
+## COMPATIVEL COM 2FA
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/c7659521-745f-4b41-b482-125c29cf046f" />
