@@ -1,8 +1,9 @@
-<script data-name="Mod Login" data-type="style">
+<script>
 /* ==========================================================================
    CUSTOM LOGIN - OPTIMIZED EDITION (GPU ACCELERATED)
    ========================================================================== */
 const CONFIG = {
+    // Cores do Tema (Azul Genérico)
     colors: {
         bgStart: "#0f172a", 
         bgEnd: "#1e3a8a",
@@ -65,6 +66,9 @@ const CONFIG = {
     }
 };
 
+/* ======================================
+   LÓGICA E ESTILOS COM ANIMAÇÕES
+   ====================================== */
 (function() {
     'use strict'; // Modo estrito para melhor performance JS
 
@@ -91,9 +95,22 @@ const CONFIG = {
         return path === '/' || path.includes('/login') || path.includes('/auth');
     }
 
+    // Verificação Robusta de Autenticação
+    function hasAuthToken() {
+        const keys = ['auth_token', 'token', 'jwt', 'access_token', 'accessToken', 'session_id'];
+        // Check Cookies
+        if (document.cookie.split(';').some(c => keys.some(k => c.trim().startsWith(k + '=')))) return true;
+        // Check LocalStorage & SessionStorage
+        try {
+            const storage = { ...localStorage, ...sessionStorage };
+            if (Object.keys(storage).some(k => keys.some(key => k.toLowerCase().includes(key) || k === key))) return true;
+        } catch(e) {}
+        return false;
+    }
+
     function cleanupLoginInterface() {
         // Se não for página de auth, remove tudo para liberar memória
-        if (!isAuthRoute() || document.cookie.includes('auth_token')) {
+        if (!isAuthRoute() || hasAuthToken()) {
             const wrapper = document.getElementById(WRAPPER_ID);
             const style = document.getElementById(STYLE_ID);
             const app = document.getElementById('app');
@@ -173,7 +190,11 @@ const CONFIG = {
             animation: gradientShift 15s ease infinite;
         }
         
-        #app { display: none !important; }
+        #app { 
+            visibility: hidden !important; 
+            height: 0 !important; 
+            overflow: hidden !important; 
+        }
 
         #${WRAPPER_ID} {
             display: flex; align-items: center; justify-content: center;
@@ -417,6 +438,10 @@ const CONFIG = {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = `
         <div id="${WRAPPER_ID}">
+            <!-- Botão de Reload Manual (PWA Fix) -->
+            <button id="custom-reload-btn" style="position:fixed;top:20px;right:20px;z-index:9999;background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:40px;height:40px;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(5px);box-shadow:0 4px 6px rgba(0,0,0,0.1);transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" title="Recarregar Página">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
             <div class="carousel-card">
                 <div class="slides-container" style="width:100%;height:100%;position:relative;">${slidesHTML}</div>
                 <button class="nav-btn prev">${arrowSVG('15 18 9 12 15 6')}</button>
@@ -433,14 +458,20 @@ const CONFIG = {
     frag.appendChild(wrapper);
     document.body.prepend(frag);
 
-    // --- 6. LOGICA OTIMIZADA (MUTATION OBSERVER) ---
-    // Substitui o setInterval pesado por um observador de eventos DOM
+    // Event Listener para Reload
+    document.getElementById('custom-reload-btn').addEventListener('click', () => window.location.reload());
+
+    // --- 6. LOGICA OTIMIZADA (HIBRIDA: OBSERVER + POLLING + TIMEOUT) ---
     const targetNode = document.getElementById('app');
     const myContainer = document.getElementById('form-container');
+    let formFound = false;
     
     const moveFormLogic = () => {
+        if (formFound) return; // Stop if already found
+
         const newForm = document.querySelector('#app form');
         if (newForm && !myContainer.contains(newForm)) {
+            formFound = true;
             // Identifica o container pai correto para mover (Compatibilidade com diversos temas)
             let contentToMove = newForm.closest('.bg-white') || newForm.closest('.dark\\:bg-n-solid-2') || newForm.parentElement;
             
@@ -453,14 +484,9 @@ const CONFIG = {
             
             myContainer.innerHTML = ''; // Limpa container
             
-            if (contentToMove.tagName === 'FORM') {
-                myContainer.appendChild(contentToMove);
-            } else {
-                // Move os filhos para preservar eventos
-                while (contentToMove.firstChild) {
-                    myContainer.appendChild(contentToMove.firstChild);
-                }
-            }
+            // Move o elemento inteiro para preservar a árvore DOM interna (Crucial para Vue/React)
+            // Evita erro "TypeError: Cannot read properties of null (reading 'insertBefore')"
+            myContainer.appendChild(contentToMove);
 
             // Reveal Animation
             requestAnimationFrame(() => {
@@ -478,7 +504,7 @@ const CONFIG = {
         }
     };
 
-    // Observer: Muito mais leve que setInterval
+    // Observer: Principal método de detecção
     if (targetNode) {
         const observer = new MutationObserver((mutations) => {
             for(let mutation of mutations) {
@@ -486,12 +512,40 @@ const CONFIG = {
             }
         });
         observer.observe(targetNode, { childList: true, subtree: true });
-        // Executa uma vez inicial
-        moveFormLogic();
-    } else {
-        // Fallback apenas se MutationObserver falhar (raro)
-        setInterval(moveFormLogic, 500);
     }
+
+    // Fallback Polling (Garante detecção se Observer falhar ou DOM for substituído)
+    // Resolve o problema de "precisar recarregar"
+    const pollingInterval = setInterval(moveFormLogic, 800);
+
+    // Safety Timeout (Evita ficar preso na tela de login se já estiver logado/dashboard)
+    // Se em 6 segundos nenhum form for encontrado, assume que é dashboard e libera
+    setTimeout(() => {
+        if (!formFound) {
+            // Verifica novamente antes de liberar
+            moveFormLogic();
+            if (!formFound) {
+                console.log("Custom Login: No form found after timeout. Cleaning up (Assuming Logged In).");
+                
+                // Force Cleanup
+                const wrapper = document.getElementById(WRAPPER_ID);
+                const style = document.getElementById(STYLE_ID);
+                const app = document.getElementById('app');
+                
+                if (wrapper) wrapper.remove();
+                if (style) style.remove();
+                if (app) { 
+                    app.style.display = ''; 
+                    app.style.opacity = '1'; 
+                    app.style.visibility = 'visible'; 
+                }
+                document.body.style.background = '';
+                document.body.style.overflow = '';
+                
+                clearInterval(pollingInterval);
+            }
+        }
+    }, 6000);
 
     // --- 7. CARROSSEL OTIMIZADO ---
     let currentIndex = 0;
