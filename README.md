@@ -27,3 +27,6 @@ Scripts prontos para uso em sua instalação do Chatwoot que adicionam funcional
 
 ## COMPATIVEL COM 2FA
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/c7659521-745f-4b41-b482-125c29cf046f" />
+
+## FALLBACK
+https://domain.com/app/login?legacy=true
